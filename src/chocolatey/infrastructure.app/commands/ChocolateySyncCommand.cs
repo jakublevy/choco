@@ -26,13 +26,12 @@ namespace chocolatey.infrastructure.app.commands
     using logging;
     using services;
 
-    [CommandFor("interactive", "shows an dialog for upgrading/downgrading packages")]
-    [CommandFor("int", "shows an dialog for upgrading/downgrading packages (alias for interactive)")]
-    public class ChocolateyInteractiveCommand : ChocolateyCommandBase, ICommand
+    [CommandFor("sync", "sync Programs and Features with chocolatey packages")]
+    public class ChocolateySyncCommand : ChocolateyCommandBase, ICommand
     {
         private readonly IChocolateyPackageService _packageService;
 
-        public ChocolateyInteractiveCommand(IChocolateyPackageService packageService)
+        public ChocolateySyncCommand(IChocolateyPackageService packageService)
         {
             _packageService = packageService;
         }
@@ -70,9 +69,6 @@ namespace chocolatey.infrastructure.app.commands
                 .Add("i|ignoredependencies|ignore-dependencies",
                      "IgnoreDependencies - Ignore dependencies when upgrading package(s). Defaults to false.",
                      option => configuration.IgnoreDependencies = option != null)
-                .Add("n|skippowershell|skip-powershell|skipscripts|skip-scripts|skip-automation-scripts",
-                     "Skip PowerShell - Do not run chocolateyInstall.ps1. Defaults to false.",
-                     option => configuration.SkipPackageInstallProvider = option != null)
                 .Add("failonunfound|fail-on-unfound",
                      "Fail On Unfound Packages - If a package is not found in sources specified, fail instead of warn.",
                      option => configuration.UpgradeCommand.FailOnUnfound = option != null)
@@ -206,10 +202,6 @@ namespace chocolatey.infrastructure.app.commands
                              configuration.Features.UsePackageRepositoryOptimizations = false;
                          }
                      })
-                .Add("pin|pinpackage|pin-package",
-                    "Pin Package - Add a pin to the package after installation. Available in 1.2.0+",
-                    option => configuration.PinPackage = option != null
-                    )
                 .Add("skiphooks|skip-hooks",
                     "Skip hooks - Do not run hook scripts. Available in 1.2.0+",
                     option => configuration.SkipHookScripts = option != null
@@ -220,16 +212,10 @@ namespace chocolatey.infrastructure.app.commands
         public virtual void ParseAdditionalArguments(IList<string> unparsedArguments, ChocolateyConfiguration configuration)
         {
             configuration.Input = string.Join(" ", unparsedArguments);
-            
-            configuration.PackageNames = string.Join(ApplicationParameters.PackageNamesSeparator.ToStringSafe(), unparsedArguments.Where(arg => !arg.StartsWith("-")));
         }
 
         public virtual void Validate(ChocolateyConfiguration configuration)
         {
-            if (string.IsNullOrWhiteSpace(configuration.PackageNames) || configuration.PackageNames.Contains(";"))
-            {
-                throw new ApplicationException("Package name is required. Please supply exactly one package name.");
-            }
 
             if (configuration.ForceDependencies && !configuration.Force)
             {
@@ -262,12 +248,12 @@ namespace chocolatey.infrastructure.app.commands
 
         public override void HelpMessage(ChocolateyConfiguration configuration)
         {
-            this.Log().Info(ChocolateyLoggers.Important, "Interactive Command");
-            this.Log().Info(@"Upgrades or downgrade a package with interactive version selection dialog. If you do not have a package installed, interactive will install it.");
+            this.Log().Info(ChocolateyLoggers.Important, "Sync Command");
+            this.Log().Info(@"Sync looks at all software that is in Programs and Features that is not being managed with Chocolatey packages and brings them under management. This means you can run one command and suddenly, all of the software installed on a machine is under management by Chocolatey!");
 
             "chocolatey".Log().Info(ChocolateyLoggers.Important, "Usage");
             "chocolatey".Log().Info(@"
-    choco interactive <pkg> [<options/switches>]
+    choco sync [<options/switches>]
 
 Skip upgrading certain packages with `choco pin`
 
@@ -278,7 +264,7 @@ NOTE: Chocolatey Pro / Business automatically synchronizes with
 
             "chocolatey".Log().Info(ChocolateyLoggers.Important, "Examples");
             "chocolatey".Log().Info(@"
-    choco interactive winfetch
+    choco sync
 
 NOTE: See scripting in the command reference (`choco -?`) for how to
  write proper scripts and integrations.
