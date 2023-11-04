@@ -676,12 +676,54 @@ package '{0}' - stopping further execution".FormatWith(packageResult.Name));
 
             return NugetEncryptionUtility.EncryptString(arguments.ToStringSafe());
         }
+
+        public virtual void DowngradeDryRun(ChocolateyConfiguration config)
+        {
+            Downgrade(config, false);
+        }
+
+        public virtual ConcurrentDictionary<string, PackageResult> Downgrade(ChocolateyConfiguration config, bool effect=true)
+        {
+            ValidatePackageNames(config);
+            string version = null;
+            config.AllowDowngrade = true;
+            config.QuietOutput = true;
+            config.ListCommand.LocalOnly = true;
+            config.ListCommand.Exact = true;
+            version = config.Version;
+            config.Version = null;
+            var installedPackage = List(config).ToList();
+            config.QuietOutput = false;
+            config.Version = version;
+            if (installedPackage.Count > 0)
+            {
+                var installedVersion = new Version(installedPackage[0].Version);
+                var toInstallVersion = new Version(config.Version);
+                if (toInstallVersion > installedVersion)
+                {
+                    throw new ApplicationException("Downgrade command cannot upgrade a package.");
+                }
+                else if (toInstallVersion == installedVersion)
+                {
+                    this.Log().Warn("The selected version is already installed, not performing any actions.", ChocolateyLoggers.Important);
+                    return null;
+                }
+            }
+            if(effect)
+                return Upgrade(config);
+            else
+            {
+                UpgradeDryRun(config);
+                return null;
+            }
+        }
         
         public virtual void InteractiveDryRun(ChocolateyConfiguration config)
         {
+            Interactive(config, false);
         }
 
-        public virtual ConcurrentDictionary<string, PackageResult> Interactive(ChocolateyConfiguration config)
+        public virtual ConcurrentDictionary<string, PackageResult> Interactive(ChocolateyConfiguration config, bool effect=true)
         {
             ValidatePackageNames(config);
             config.AllVersions = true;
@@ -735,13 +777,28 @@ package '{0}' - stopping further execution".FormatWith(packageResult.Name));
                 else if (installedNum > versionNumSelected)
                 {
                     //upgrade
-                    Upgrade(config);
+                    if(effect)
+                        return Upgrade(config);
+                    else
+                        this.Log().Info($"{config.PackageNames} would be upgraded from {installedPackage[0].Version} to {config.Version}");
+                    
                 }
                 else
                 {
                     //downgrade
-                    //Downgrade(config);
+                    if(effect)
+                        return Downgrade(config);
+                    else
+                        this.Log().Info($"{config.PackageNames} would be downgraded from {installedPackage[0].Version} to {config.Version}");
                 }
+            }
+            else
+            {
+                //install
+                if(effect)
+                    return Upgrade(config);
+                else
+                    this.Log().Info($"{config.PackageNames} version {config.Version} would be installed");
             }
             return null;
         }

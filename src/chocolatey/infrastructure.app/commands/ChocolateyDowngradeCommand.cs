@@ -26,13 +26,24 @@ namespace chocolatey.infrastructure.app.commands
     using logging;
     using services;
 
-    [CommandFor("interactive", "shows an dialog for upgrading/downgrading packages")]
-    [CommandFor("int", "shows an dialog for upgrading/downgrading packages (alias for interactive)")]
-    public class ChocolateyInteractiveCommand : ChocolateyCommandBase, ICommand
+    [CommandFor("downgrade", "downgrades packages from various sources")]
+    public class ChocolateyDowngradeCommand : ChocolateyCommandBase, ICommand
     {
         private readonly IChocolateyPackageService _packageService;
 
-        public ChocolateyInteractiveCommand(IChocolateyPackageService packageService)
+        private readonly string[] _removedOptions = new[]
+        {
+            "-m",
+            "-sxs",
+            "--sidebyside",
+            "--side-by-side",
+            "--allowmultiple",
+            "--allow-multiple",
+            "--allowmultipleversions",
+            "--allow-multiple-versions",
+        };
+
+        public ChocolateyDowngradeCommand(IChocolateyPackageService packageService)
         {
             _packageService = packageService;
         }
@@ -43,6 +54,9 @@ namespace chocolatey.infrastructure.app.commands
                 .Add("s=|source=",
                      "Source - The source to find the package(s) to install. Special sources include: ruby, cygwin, windowsfeatures, and python. To specify more than one source, pass it with a semi-colon separating the values (e.g. \"'source1;source2'\"). Defaults to default feeds.",
                      option => configuration.Sources = option.UnquoteSafe())
+                .Add("version=",
+                     "Version - A specific version to install. Defaults to unspecified.",
+                     option => configuration.Version = option.UnquoteSafe())
                 .Add("pre|prerelease",
                      "Prerelease - Include Prereleases? Defaults to false.",
                      option => configuration.Prerelease = option != null)
@@ -148,20 +162,16 @@ namespace chocolatey.infrastructure.app.commands
                      "UsePackageExitCodes - Package scripts can provide exit codes. Use those for choco's exit code when non-zero (this value can come from a dependency package). Chocolatey defines valid exit codes as 0, 1605, 1614, 1641, 3010. Overrides the default feature '{0}' set to '{1}'.".FormatWith(ApplicationParameters.Features.UsePackageExitCodes, configuration.Features.UsePackageExitCodes.ToStringSafe()),
                      option => configuration.Features.UsePackageExitCodes = option != null
                      )
-                .Add("except=",
-                     "Except - a comma-separated list of package names that should not be upgraded when upgrading 'all'. Overrides the configuration setting '{0}' set to '{1}'.".FormatWith(ApplicationParameters.ConfigSettings.UpgradeAllExceptions, configuration.UpgradeCommand.PackageNamesToSkip.ToStringSafe()),
-                     option => configuration.UpgradeCommand.PackageNamesToSkip = option.UnquoteSafe()
-                     )
                 .Add("stoponfirstfailure|stop-on-first-failure|stop-on-first-package-failure",
-                     "Stop On First Package Failure - stop running install, upgrade or uninstall on first package failure instead of continuing with others. Overrides the default feature '{0}' set to '{1}'.".FormatWith(ApplicationParameters.Features.StopOnFirstPackageFailure, configuration.Features.StopOnFirstPackageFailure.ToStringSafe()),
+                     "Stop On First Package Failure - stop running install, upgrade/downgrade or uninstall on first package failure instead of continuing with others. Overrides the default feature '{0}' set to '{1}'.".FormatWith(ApplicationParameters.Features.StopOnFirstPackageFailure, configuration.Features.StopOnFirstPackageFailure.ToStringSafe()),
                      option => configuration.Features.StopOnFirstPackageFailure = option != null
                      )
                 .Add("skip-if-not-installed|only-upgrade-installed|skip-when-not-installed",
-                     "Skip Packages Not Installed - if a package is not installed, do not install it during the upgrade process. Overrides the default feature '{0}' set to '{1}'.".FormatWith(ApplicationParameters.Features.SkipPackageUpgradesWhenNotInstalled, configuration.Features.SkipPackageUpgradesWhenNotInstalled.ToStringSafe()),
+                     "Skip Packages Not Installed - if a package is not installed, do not install it during the downgrade process. Overrides the default feature '{0}' set to '{1}'.".FormatWith(ApplicationParameters.Features.SkipPackageUpgradesWhenNotInstalled, configuration.Features.SkipPackageUpgradesWhenNotInstalled.ToStringSafe()),
                      option => configuration.Features.SkipPackageUpgradesWhenNotInstalled = option != null
                      )
                 .Add("install-if-not-installed",
-                     "Install Missing Packages When Not Installed - if a package is not installed, install it as part of running upgrade (typically default behavior). Overrides the default feature '{0}' set to '{1}'.".FormatWith(ApplicationParameters.Features.SkipPackageUpgradesWhenNotInstalled, configuration.Features.SkipPackageUpgradesWhenNotInstalled.ToStringSafe()),
+                     "Install Missing Packages When Not Installed - if a package is not installed, install it as part of running downgrade (typically default behavior). Overrides the default feature '{0}' set to '{1}'.".FormatWith(ApplicationParameters.Features.SkipPackageUpgradesWhenNotInstalled, configuration.Features.SkipPackageUpgradesWhenNotInstalled.ToStringSafe()),
                      option =>
                      {
                          if (option != null)
@@ -170,23 +180,23 @@ namespace chocolatey.infrastructure.app.commands
                          }
                      })
                 .Add("exclude-pre|exclude-prerelease|exclude-prereleases",
-                     "Exclude Prerelease - Should prerelease be ignored for upgrades? Will be ignored if you pass `--pre`.",
+                     "Exclude Prerelease - Should prerelease be ignored for downgrades? Will be ignored if you pass `--pre`.",
                      option => configuration.UpgradeCommand.ExcludePrerelease = option != null
                      )
                 .Add("userememberedargs|userememberedarguments|userememberedoptions|use-remembered-args|use-remembered-arguments|use-remembered-options",
-                     "Use Remembered Options for Upgrade - use the arguments and options used during install for upgrade. Does not override arguments being passed at runtime. Overrides the default feature '{0}' set to '{1}'.".FormatWith(ApplicationParameters.Features.UseRememberedArgumentsForUpgrades, configuration.Features.UseRememberedArgumentsForUpgrades.ToStringSafe()),
+                     "Use Remembered Options for downgrade - use the arguments and options used during install for downgrade. Does not override arguments being passed at runtime. Overrides the default feature '{0}' set to '{1}'.".FormatWith(ApplicationParameters.Features.UseRememberedArgumentsForUpgrades, configuration.Features.UseRememberedArgumentsForUpgrades.ToStringSafe()),
                      option =>
                      {
                          if (option != null) configuration.Features.UseRememberedArgumentsForUpgrades = true;
                      })
                 .Add("ignorerememberedargs|ignorerememberedarguments|ignorerememberedoptions|ignore-remembered-args|ignore-remembered-arguments|ignore-remembered-options",
-                     "Ignore Remembered Options for Upgrade - ignore the arguments and options used during install for upgrade. Overrides the default feature '{0}' set to '{1}'.".FormatWith(ApplicationParameters.Features.UseRememberedArgumentsForUpgrades, configuration.Features.UseRememberedArgumentsForUpgrades.ToStringSafe()),
+                     "Ignore Remembered Options for downgrade - ignore the arguments and options used during install for downgrade. Overrides the default feature '{0}' set to '{1}'.".FormatWith(ApplicationParameters.Features.UseRememberedArgumentsForUpgrades, configuration.Features.UseRememberedArgumentsForUpgrades.ToStringSafe()),
                      option =>
                      {
                          if (option != null) configuration.Features.UseRememberedArgumentsForUpgrades = false;
                      })
                 .Add("exitwhenrebootdetected|exit-when-reboot-detected",
-                     "Exit When Reboot Detected - Stop running install, upgrade, or uninstall when a reboot request is detected. Requires '{0}' feature to be turned on. Will exit with either {1} or {2}. Overrides the default feature '{3}' set to '{4}'.".FormatWith
+                     "Exit When Reboot Detected - Stop running install, downgrade, or uninstall when a reboot request is detected. Requires '{0}' feature to be turned on. Will exit with either {1} or {2}. Overrides the default feature '{3}' set to '{4}'.".FormatWith
                          (ApplicationParameters.Features.UsePackageExitCodes, ApplicationParameters.ExitCodes.ErrorFailNoActionReboot, ApplicationParameters.ExitCodes.ErrorInstallSuspend, ApplicationParameters.Features.ExitOnRebootDetected, configuration.Features.ExitOnRebootDetected.ToStringSafe()),
                      option => configuration.Features.ExitOnRebootDetected = option != null
                      )
@@ -201,7 +211,7 @@ namespace chocolatey.infrastructure.app.commands
                          }
                      })
                 .Add("disable-repository-optimizations|disable-package-repository-optimizations",
-                     "Disable Package Repository Optimizations - Do not use optimizations for reducing bandwidth with repository queries during package install/upgrade/outdated operations. Should not generally be used, unless a repository needs to support older methods of query. When disabled, this makes queries similar to the way they were done in earlier versions of Chocolatey. Overrides the default feature '{0}' set to '{1}'.".FormatWith
+                     "Disable Package Repository Optimizations - Do not use optimizations for reducing bandwidth with repository queries during package install/upgrade/downgrade/outdated operations. Should not generally be used, unless a repository needs to support older methods of query. When disabled, this makes queries similar to the way they were done in earlier versions of Chocolatey. Overrides the default feature '{0}' set to '{1}'.".FormatWith
                          (ApplicationParameters.Features.UsePackageRepositoryOptimizations, configuration.Features.UsePackageRepositoryOptimizations.ToStringSafe()),
                      option =>
                      {
@@ -211,7 +221,7 @@ namespace chocolatey.infrastructure.app.commands
                          }
                      })
                 .Add("pin|pinpackage|pin-package",
-                    "Pin Package - Add a pin to the package after installation. Available in 1.2.0+",
+                    "Pin Package - Add a pin to the package after downgrade. Available in 1.2.0+",
                     option => configuration.PinPackage = option != null
                     )
                 .Add("skiphooks|skip-hooks",
@@ -224,7 +234,6 @@ namespace chocolatey.infrastructure.app.commands
         public virtual void ParseAdditionalArguments(IList<string> unparsedArguments, ChocolateyConfiguration configuration)
         {
             configuration.Input = string.Join(" ", unparsedArguments);
-            
             configuration.PackageNames = string.Join(ApplicationParameters.PackageNamesSeparator.ToStringSafe(), unparsedArguments.Where(arg => !arg.StartsWith("-")));
         }
 
@@ -232,12 +241,17 @@ namespace chocolatey.infrastructure.app.commands
         {
             if (string.IsNullOrWhiteSpace(configuration.PackageNames) || configuration.PackageNames.Contains(";"))
             {
-                throw new ApplicationException("Package name is required. Please supply exactly one package name.");
+                throw new ApplicationException("Package name is required. Please pass at least one package name to downgrade.");
             }
 
             if (configuration.ForceDependencies && !configuration.Force)
             {
                 throw new ApplicationException("Force dependencies can only be used with force also turned on.");
+            }
+
+            if (configuration.Version == null)
+            {
+                throw new ApplicationException("Missing required --version parameter.");
             }
 
             if (!string.IsNullOrWhiteSpace(configuration.Input))
@@ -266,15 +280,17 @@ namespace chocolatey.infrastructure.app.commands
 
         public override void HelpMessage(ChocolateyConfiguration configuration)
         {
-            this.Log().Info(ChocolateyLoggers.Important, "Interactive Command");
-            this.Log().Info(@"Upgrades or downgrade a package with interactive version selection dialog. If you do not have a package installed, interactive will install it.");
+            this.Log().Info(ChocolateyLoggers.Important, "Downgrade Command");
+            this.Log().Info(@"
+Downgrade a package or a list of packages. If you do not have a package
+ installed, downgrade will install it.
+");
 
             "chocolatey".Log().Info(ChocolateyLoggers.Important, "Usage");
             "chocolatey".Log().Info(@"
-    choco interactive <pkg> [<options/switches>]
+    choco downgrade <pkg> --version=VERSION [<options/switches>]
 
-Skip upgrading certain packages with `choco pin` or with the option
- `--except`.
+Skip downgrading certain packages with `choco pin`
 
 NOTE: Chocolatey Pro / Business automatically synchronizes with
  Programs and Features, ensuring automatically updating apps' versions
@@ -283,7 +299,15 @@ NOTE: Chocolatey Pro / Business automatically synchronizes with
 
             "chocolatey".Log().Info(ChocolateyLoggers.Important, "Examples");
             "chocolatey".Log().Info(@"
-    choco interactive winfetch
+    choco downgrade chocolatey --version 1.5.0
+    choco downgrade git --version 2.0.0 -y --params=""'/GitAndUnixToolsOnPath /NoAutoCrlf'""
+    choco downgrade git --version 2.0.0 -y --params=""'/GitAndUnixToolsOnPath /NoAutoCrlf'"" --install-args=""'/DIR=C:\git'""
+    # Params are package parameters, passed to the package
+    # Install args are installer arguments, appended to the silentArgs
+    #  in the package for the installer itself
+    choco downgrade nodejs.install --version 0.10.35
+    choco downgrade git --version 2.0.0 -s ""'https://somewhere/out/there'""
+    choco downgrade git --version 2.0.0 -s ""'https://somewhere/protected'"" -u user -p pass
 
 NOTE: See scripting in the command reference (`choco -?`) for how to
  write proper scripts and integrations.
@@ -315,16 +339,31 @@ In addition to the above exit codes, you may also see reboot exit codes
  when the feature '{1}' is turned on. It typically requires
  the feature '{0}' to also be turned on to work properly.
 ".FormatWith(ApplicationParameters.Features.UsePackageExitCodes, ApplicationParameters.Features.ExitOnRebootDetected));
+
+            "chocolatey".Log().Info(ChocolateyLoggers.Important, "See It In Action");
+            "chocolatey".Log().Info(@"
+choco downgrade: https://raw.githubusercontent.com/wiki/chocolatey/choco/images/gifs/choco_upgrade.gif
+
+");
+
+            "chocolatey".Log().Info(ChocolateyLoggers.Important, "Options and Switches");
+            "chocolatey".Log().Info(@"
+NOTE: Options and switches apply to all items passed, so if you are
+ installing multiple packages, and you use `--version=1.0.0`, it is
+ going to look for and try to install version 1.0.0 of every package
+ passed. So please split out multiple package calls when wanting to
+ pass specific options.
+");
         }
 
         public virtual void DryRun(ChocolateyConfiguration configuration)
         {
-            _packageService.InteractiveDryRun(configuration);
+            _packageService.DowngradeDryRun(configuration);
         }
 
         public virtual void Run(ChocolateyConfiguration configuration)
         {
-            _packageService.Interactive(configuration);
+            _packageService.Downgrade(configuration);
         }
 
         public virtual bool MayRequireAdminAccess()

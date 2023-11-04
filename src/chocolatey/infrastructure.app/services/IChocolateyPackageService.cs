@@ -95,8 +95,9 @@ namespace chocolatey.infrastructure.app.services
         ///   Upgrades or downgrades a package
         /// </summary>
         /// <param name="config">The configuration.</param>
+        /// <param name="effect">Whether the method should have any effect</param>
         /// <returns>results of upgrade or downgrade</returns>
-        ConcurrentDictionary<string, PackageResult> Interactive(ChocolateyConfiguration config);
+        ConcurrentDictionary<string, PackageResult> Interactive(ChocolateyConfiguration config, bool effect=true);
 
         /// <summary>
         ///  Run outdated in noop mode
@@ -109,6 +110,21 @@ namespace chocolatey.infrastructure.app.services
         /// </summary>
         /// <param name="config">The configuration.</param>
         void Outdated(ChocolateyConfiguration config);
+        
+        /// <summary>
+        ///   Run downgrade in noop mode
+        /// </summary>
+        /// <param name="config">The configuration.</param>
+        void DowngradeDryRun(ChocolateyConfiguration config);
+
+        /// <summary>
+        ///   Downgrades packages
+        /// </summary>
+        /// <param name="config">The configuration.</param>
+        /// <param name="effect">Whether the method should have any effect</param>
+        /// <returns>results of upgrades</returns>
+        ConcurrentDictionary<string, PackageResult> Downgrade(ChocolateyConfiguration config, bool effect=true);
+        
 
         /// <summary>
         ///   Run upgrade in noop mode

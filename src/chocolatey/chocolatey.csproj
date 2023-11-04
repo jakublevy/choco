@@ -203,6 +203,7 @@
     <Compile Include="ExceptionExtensions.cs" />
     <Compile Include="infrastructure.app\attributes\MultiServiceAttribute.cs" />
     <Compile Include="infrastructure.app\commands\ChocolateyCacheCommand.cs" />
+    <Compile Include="infrastructure.app\commands\ChocolateyDowngradeCommand.cs" />
     <Compile Include="infrastructure.app\commands\ChocolateyInteractiveCommand.cs" />
     <Compile Include="infrastructure.app\commands\ChocolateyListCommand.cs" />
     <Compile Include="infrastructure.app\commands\ChocolateyTemplateCommand.cs" />
