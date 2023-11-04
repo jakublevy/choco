@@ -244,7 +244,7 @@ Did you know Pro / Business automatically syncs with Programs and
 
             RandomlyNotifyAboutLicensedFeatures(config, ProBusinessListMessage);
         }
-
+        
         public virtual IEnumerable<PackageResult> List(ChocolateyConfiguration config)
         {
             if (string.IsNullOrWhiteSpace(config.Sources) && !config.ListCommand.LocalOnly)
@@ -676,6 +676,75 @@ package '{0}' - stopping further execution".FormatWith(packageResult.Name));
 
             return NugetEncryptionUtility.EncryptString(arguments.ToStringSafe());
         }
+        
+        public virtual void InteractiveDryRun(ChocolateyConfiguration config)
+        {
+        }
+
+        public virtual ConcurrentDictionary<string, PackageResult> Interactive(ChocolateyConfiguration config)
+        {
+            ValidatePackageNames(config);
+            config.AllVersions = true;
+            config.QuietOutput = true;
+            config.ListCommand.Exact = true;
+            var packageResults = List(config).ToList();
+            config.AllVersions = false;
+            if (packageResults.Count == 0)
+            {
+                throw new ApplicationException(
+                    $"Package {config.PackageNames} not installed. The package was not found with the source(s) listed.");
+            }
+
+            config.ListCommand.LocalOnly = true;
+            var installedPackage = List(config).ToList();
+            config.QuietOutput = false;
+            this.Log().Info($"Package {config.PackageNames}");
+            int installedNum = -1;
+            for (int i = 0; i < packageResults.Count; ++i)
+            {
+                string installedText = "";
+                if (installedPackage.Count > 0 && packageResults[i].Version == installedPackage[0].Version)
+                {
+                    installedNum = i + 1;
+                    installedText = " [installed]";
+                }
+                this.Log().Info($"{i+1}) {packageResults[i].Version}{installedText}");   
+            }
+
+            string n = null;
+            int versionNumSelected;
+            do
+            {
+                if (n != null)
+                    this.Log().Error("Incorrect number, try again");
+                
+                Console.Write("Please type a number corresponding to a version you want to install: ");
+                n = Console.ReadLine();
+            } while (!int.TryParse(n, out versionNumSelected) || versionNumSelected < 1 || versionNumSelected > packageResults.Count);
+
+            string versionToInstall = packageResults[versionNumSelected - 1].Version;
+            config.Version = versionToInstall;
+            if (installedPackage.Count > 0)
+            {
+                if (installedNum == versionNumSelected)
+                {
+                    this.Log().Warn("The selected version is already installed, not performing any actions.", ChocolateyLoggers.Important);
+                    return null;
+                }
+
+                else if (installedNum > versionNumSelected)
+                {
+                    //upgrade
+                    Upgrade(config);
+                }
+                else
+                {
+                    //downgrade
+                    //Downgrade(config);
+                }
+            }
+            return null;
+        }
 
         public virtual ConcurrentDictionary<string, PackageResult> Install(ChocolateyConfiguration config)
         {
@@ -693,8 +762,7 @@ package '{0}' - stopping further execution".FormatWith(packageResult.Name));
                 Environment.ExitCode = 1;
                 return packageInstalls;
             }
-
-            this.Log().Info(@"By installing, you accept licenses for the packages.");
+            this.Log().Warn(@"By installing, you accept licenses for the packages.");
 
             GetInitialEnvironment(config, allowLogging: true);
 

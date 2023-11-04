@@ -83,6 +83,20 @@ namespace chocolatey.infrastructure.app.services
         /// <param name="config">The configuration.</param>
         /// <returns>results of installs</returns>
         ConcurrentDictionary<string, PackageResult> Install(ChocolateyConfiguration config);
+        
+        /// <summary>
+        ///   Run interactive in noop mode 
+        /// </summary>
+        /// <param name="config">The configuration.</param>
+        void InteractiveDryRun(ChocolateyConfiguration config);
+        
+        
+        /// <summary>
+        ///   Upgrades or downgrades a package
+        /// </summary>
+        /// <param name="config">The configuration.</param>
+        /// <returns>results of upgrade or downgrade</returns>
+        ConcurrentDictionary<string, PackageResult> Interactive(ChocolateyConfiguration config);
 
         /// <summary>
         ///  Run outdated in noop mode

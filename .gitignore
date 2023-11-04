@@ -54,3 +54,7 @@ tools/**
 BuildArtifacts/
 code_drop/
 src/chocolatey.install/assets/Install.ps1
+
+src/.idea
+src/UpgradeLog.htm
+src/UpgradeLog2.htm
