@@ -23,6 +23,7 @@ namespace chocolatey.infrastructure.app.services
     using System.IO;
     using System.Linq;
     using System.Text;
+    using System.Windows.Input;
     using chocolatey.infrastructure.app.registration;
     using commandline;
     using configuration;
@@ -32,6 +33,7 @@ namespace chocolatey.infrastructure.app.services
     using infrastructure.events;
     using infrastructure.services;
     using logging;
+    using Microsoft.Win32;
     using nuget;
     using NuGet.Configuration;
     using NuGet.Packaging;
@@ -40,8 +42,11 @@ namespace chocolatey.infrastructure.app.services
     using platforms;
     using results;
     using SimpleInjector;
+    using Microsoft.Win32;
     using tolerance;
+    using utility;
     using IFileSystem = filesystem.IFileSystem;
+    using Registry = domain.Registry;
 
     public class ChocolateyPackageService : IChocolateyPackageService
     {
@@ -801,6 +806,58 @@ package '{0}' - stopping further execution".FormatWith(packageResult.Name));
                     this.Log().Info($"{config.PackageNames} version {config.Version} would be installed");
             }
             return null;
+        }
+
+        public void SyncDryRun(ChocolateyConfiguration config)
+        {
+            Sync(config, false);
+        }
+
+        public ConcurrentDictionary<string, PackageResult> Sync(ChocolateyConfiguration config, bool effect = true)
+        {
+            LoadProgramsFromRegistry();
+            return null;
+        }
+
+        private List<ProgramRegistryEntry> LoadProgramsFromRegistry()
+        {
+            List<ProgramRegistryEntry> entries = new List<ProgramRegistryEntry>(); 
+            using (RegistryKey key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"))
+                entries = entries.Concat(LoadProgramsFromRegistry(key)).ToList();
+
+            if (Environment.Is64BitOperatingSystem)
+            {
+                using (RegistryKey key =  Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall"))
+                    entries = entries.Concat(LoadProgramsFromRegistry(key)).ToList();
+            }
+            
+            using (RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"))
+                entries = entries.Concat(LoadProgramsFromRegistry(key)).ToList();
+
+            return entries;
+        }
+
+        private List<ProgramRegistryEntry> LoadProgramsFromRegistry(RegistryKey uninstallKey)
+        {
+            List<ProgramRegistryEntry> entries = new List<ProgramRegistryEntry>();
+            foreach (string uuid in uninstallKey.GetSubKeyNames())
+            {
+                using (RegistryKey key = uninstallKey.OpenSubKey(uuid))
+                {
+                    string[] valueNames = key.GetValueNames();
+                    if (valueNames.Contains("DisplayName") && valueNames.Contains("DisplayVersion"))
+                    {
+                        ProgramRegistryEntry entry = new ProgramRegistryEntry
+                        {
+                            DisplayName = (string)key.GetValue("DisplayName"),
+                            DisplayVersion = (string)key.GetValue("DisplayVersion")
+                        };
+                        entries.Add(entry);
+                    }
+                } 
+            }
+
+            return entries;
         }
 
         public virtual ConcurrentDictionary<string, PackageResult> Install(ChocolateyConfiguration config)

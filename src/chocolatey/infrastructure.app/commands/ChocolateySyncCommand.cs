@@ -300,12 +300,12 @@ In addition to the above exit codes, you may also see reboot exit codes
 
         public virtual void DryRun(ChocolateyConfiguration configuration)
         {
-            _packageService.InteractiveDryRun(configuration);
+            _packageService.SyncDryRun(configuration);
         }
 
         public virtual void Run(ChocolateyConfiguration configuration)
         {
-            _packageService.Interactive(configuration);
+            _packageService.Sync(configuration);
         }
 
         public virtual bool MayRequireAdminAccess()

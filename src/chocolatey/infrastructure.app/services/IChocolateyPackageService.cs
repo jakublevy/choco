@@ -98,6 +98,22 @@ namespace chocolatey.infrastructure.app.services
         /// <param name="effect">Whether the method should have any effect</param>
         /// <returns>results of upgrade or downgrade</returns>
         ConcurrentDictionary<string, PackageResult> Interactive(ChocolateyConfiguration config, bool effect=true);
+        
+        
+        /// <summary>
+        ///   Run sync in noop mode 
+        /// </summary>
+        /// <param name="config">The configuration.</param>
+        void SyncDryRun(ChocolateyConfiguration config);
+        
+        
+        /// <summary>
+        ///   Sync packages with Program and Features
+        /// </summary>
+        /// <param name="config">The configuration.</param>
+        /// <param name="effect">Whether the method should have any effect</param>
+        /// <returns>results of upgrade or downgrade</returns>
+        ConcurrentDictionary<string, PackageResult> Sync(ChocolateyConfiguration config, bool effect=true);
 
         /// <summary>
         ///  Run outdated in noop mode
