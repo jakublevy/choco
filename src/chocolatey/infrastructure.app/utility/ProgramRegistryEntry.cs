@@ -84,6 +84,13 @@ namespace chocolatey.infrastructure.app.utility
                     possibleNames.Add(prev.Pop());
             }
 
+            for (int i = 1; i < split.Length; ++i)
+            {
+                if (split[i].Contains("-"))
+                    possibleNames.Add(split[i].Replace("-", ""));
+                possibleNames.Add(split[i]);
+            }
+            
             return possibleNames.ToList();
         }
 
