@@ -312,7 +312,7 @@ Did you know Pro / Business automatically syncs with Programs and
                 }
             }
 
-            RandomlyNotifyAboutLicensedFeatures(config, ProBusinessListMessage);
+            //RandomlyNotifyAboutLicensedFeatures(config, ProBusinessListMessage);
         }
 
         private IEnumerable<PackageResult> ReportRegistryPrograms(ChocolateyConfiguration config, IEnumerable<PackageResult> list)
@@ -813,10 +813,65 @@ package '{0}' - stopping further execution".FormatWith(packageResult.Name));
             Sync(config, false);
         }
 
-        public ConcurrentDictionary<string, PackageResult> Sync(ChocolateyConfiguration config, bool effect = true)
+        public void Sync(ChocolateyConfiguration config, bool effect = true)
         {
-            LoadProgramsFromRegistry();
-            return null;
+            config.ListCommand.LocalOnly = false;
+            config.AllVersions = true;
+            config.ListCommand.Exact = true;
+            config.QuietOutput = true;
+            List<ProgramRegistryEntry> entries = LoadProgramsFromRegistry();
+            foreach (ProgramRegistryEntry entry in entries)
+            {
+                this.Log().Info($"{entry.DisplayName} version {entry.DisplayVersion}");
+                List<string> possibleNames = entry.SearchableNames;
+                for (int i = 0; i < possibleNames.Count; ++i)
+                {
+                    config.PackageNames = possibleNames[i];
+                    config.Input = possibleNames[i];
+                    config.Version = entry.ChocolateyVersion;
+                    List<PackageResult> remotePackages = new List<PackageResult>();
+                    try
+                    {
+                        remotePackages = List(config).ToList();
+                    }
+                    catch (Exception e)
+                    {
+                        this.Log().Error("Could not parse a correct Nuget compatible version from Windows registry\n");
+                        break;
+                    }
+
+                    if (remotePackages.Count == 1)
+                    {
+                        config.ListCommand.LocalOnly = true;
+                        var localPackages = List(config).ToList();
+                        config.ListCommand.LocalOnly = false;
+                        if (localPackages.Count == 1)
+                        {
+                            this.Log().Info("Already installed\n");
+                            break;
+                        }
+                        else
+                        {
+                            if (effect)
+                            {
+                                this.Log().Info($"Syncing with {config.PackageNames} version {config.Version}");
+                                config.Noop = true;
+                                config.SkipPackageInstallProvider = true;
+                                Install(config);
+                                config.Noop = false;
+                                config.SkipPackageInstallProvider = false;
+                            }
+                            else
+                            {
+                                this.Log().Info($"{config.PackageNames} version {config.Version} would be installed");
+                            }
+                            break;
+                        }
+                    }
+                   if(i == possibleNames.Count - 1)
+                       this.Log().Info("Could not find a package to sync with\n");
+                }
+            }
         }
 
         private List<ProgramRegistryEntry> LoadProgramsFromRegistry()
@@ -827,7 +882,7 @@ package '{0}' - stopping further execution".FormatWith(packageResult.Name));
 
             if (Environment.Is64BitOperatingSystem)
             {
-                using (RegistryKey key =  Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall"))
+                using (RegistryKey key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall"))
                     entries = entries.Concat(LoadProgramsFromRegistry(key)).ToList();
             }
             

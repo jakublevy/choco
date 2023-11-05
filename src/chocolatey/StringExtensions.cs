@@ -289,6 +289,11 @@ namespace chocolatey
 
             return input;
         }
+        
+        public static bool ContainsAlpha(this string strToCheck)
+        {
+            return strToCheck.Any(char.IsLetter);
+        }
 
 #pragma warning disable IDE1006
         [Obsolete("This overload is deprecated and will be removed in v3.")]

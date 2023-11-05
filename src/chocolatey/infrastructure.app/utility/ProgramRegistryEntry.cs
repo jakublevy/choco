@@ -16,11 +16,104 @@
 
 namespace chocolatey.infrastructure.app.utility
 {
-    using System;
+    using System.Collections.Generic;
+    using System.Linq;
+    using System.Text.RegularExpressions;
 
     public class ProgramRegistryEntry
     {
         public string DisplayName { get; set; }
         public string DisplayVersion { get; set; }
+
+
+        public List<string> SearchableNames
+        {
+            get
+            {
+                string[] split = Regex.Split(DisplayName.ToLower(), @"[ ]+");
+                return GenerateAllNameVariants(split);
+            }
+        }
+
+        private List<string> GenerateAllNameVariants(string[] split)
+        {
+            HashSet<string> possibleNames = new HashSet<string>();
+            
+            for (int j = split.Length; j > 0; --j)
+            {
+                string[] splitName = split.Take(j).ToArray();
+
+                Stack<string> prev = new Stack<string>();
+                Stack<string> next = new Stack<string>();
+
+                if (split[0].Contains("-"))
+                    prev.Push(split[0].Replace("-", ""));
+
+                prev.Push(split[0]);
+
+                for (int k = 0; k < 2; ++k)
+                {
+                    for (int i = 1; i < splitName.Length - 1; ++i)
+                    {
+                        while (prev.Any())
+                        {
+                            string s = prev.Pop();
+                            string a;
+                            if (k == 0)
+                                a = s + splitName[i];
+                            else
+                                a = s + "-" + splitName[i];
+                            next.Push(a);
+                            if (splitName[i].Contains("-"))
+                            {
+                                string z = splitName[i].Replace("-", "");
+                                string c;
+                                if (k == 0)
+                                    c = s + z;
+                                else
+                                    c = s + "-" + z;
+                                next.Push(c);
+                            }
+                        }
+                        (prev, next) = (next, prev);
+                    }
+                    
+                }
+
+                while (prev.Any())
+                    possibleNames.Add(prev.Pop());
+            }
+
+            return possibleNames.ToList();
+        }
+
+        public string ChocolateyVersion
+        {
+            get
+            {
+                string version = null;
+                string[] split = Regex.Split(DisplayVersion.ToLower(), @"[ ]+");
+                if (split.Length > 1)
+                {
+                    for (int i = 0; i < split.Length; ++i)
+                    {
+                        if (Regex.IsMatch(split[i], "^[0-9\\.-]+$"))
+                        {
+                            version = split[i];
+                            break;
+                        }
+                    }
+                    if(version == null)
+                        version = split[split.Length - 1];
+                }
+                else
+                    version = DisplayVersion;
+                
+                if (version.Contains("-") && !version.ContainsAlpha())
+                    return version.Replace('-', '.');
+
+                return version;
+            }
+        }
     }
 }
