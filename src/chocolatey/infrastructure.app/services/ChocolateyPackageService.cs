@@ -867,8 +867,8 @@ package '{0}' - stopping further execution".FormatWith(packageResult.Name));
                             }
                             break;
                         }
-                    }
-                   if(i == possibleNames.Count - 1)
+                    } 
+                    if(i == possibleNames.Count - 1)
                        this.Log().Info("Could not find a package to sync with\n");
                 }
             }
